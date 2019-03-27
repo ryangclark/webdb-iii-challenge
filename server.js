@@ -22,21 +22,18 @@ server.post('/api/cohorts', (req, res) => {
     .insert(req.body)
     .then(newCohortId =>
       db('cohorts')
-        .select('*')
+        .select()
         .where('id', newCohortId[0])
+        .first()
+        .then(newCohort => res.status(201).json(newCohort))
     )
-    .then(newCohort =>
-      res
-        .status(201)
-        .json(newCohort)
-        .catch(error => {
-          console.error(error);
-          res.status(500).json({
-            message: 'The request could not be completed.',
-            error: error
-          });
-        })
-    );
+    .catch(error => {
+      console.error(error);
+      res.status(500).json({
+        message: 'The request could not be completed.',
+        error: error
+      });
+    });
 });
 
 // [GET] /api/cohorts
@@ -57,9 +54,15 @@ server.get('/api/cohorts', (req, res) => {
 // Return the cohort with the matching id.
 server.get('/api/cohorts/:id', (req, res) => {
   db('cohorts')
-    .select('*')
+    .select()
     .where('id', req.params.id)
-    .then(cohort => res.status(200).json(cohort[0]))
+    .first()
+    .then(cohort => {
+      if (!cohort) {
+        return res.status(404).json({ message: 'No cohort found.' });
+      }
+      res.status(200).json(cohort);
+    })
     .catch(error => {
       console.error(error);
       res
@@ -101,7 +104,7 @@ server.put('/api/cohorts/:id', (req, res) => {
         db('cohorts')
           .select('*')
           .where('id', req.params.id)
-          .then(updatedCohort => res.status(201).json(updatedCohort))
+          .then(updatedCohort => res.status(201).json(updatedCohort[0]));
       }
     })
     .catch(error => {
@@ -130,6 +133,148 @@ server.delete('/api/cohorts/:id', (req, res) => {
       res
         .status(500)
         .json({ message: 'Error completing the request.', error: error });
+    });
+});
+
+/**
+ * ––– STUDENTS –––
+ */
+// [POST] /students
+// Saves a new student to the database.
+server.post('/students', (req, res) => {
+  if (!req.body.name || !req.body.cohort_id) {
+    return res
+      .status(400)
+      .json({ message: 'Please send `name` and `cohort_id` properties.' });
+  }
+  db('students')
+    .insert(req.body)
+    .then(newId =>
+      db('students')
+        .select()
+        .where('id', newId[0])
+        .first()
+        .then(newStudent => res.status(201).json(newStudent))
+    )
+    .catch(error => {
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: 'The request could not completed.', error: error });
+    });
+});
+
+// [GET] /students
+// Returns an array of all students.
+server.get('/students', (req, res) => {
+  db('students')
+    .select()
+    .then(students => res.status(200).json(students))
+    .catch(error => {
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: 'The request could not completed.', error: error });
+    });
+});
+
+// [GET] /students/:id
+// Returns student with the matching id.
+// {
+//   id: 1,
+//   name: 'Lambda Student',
+//   cohort: 'Full Stack Web Infinity'
+// }
+server.get('/students/:id', (req, res) => {
+  db('students')
+    .join('cohorts', 'students.cohort_id', '=', 'cohorts.id')
+    .select({
+      id: 'students.id',
+      name: 'students.name',
+      cohort: 'cohorts.name'
+    })
+    .where('students.id', req.params.id)
+    .first()
+    .then(student => {
+      if (!student) {
+        return res.status(404).json({ message: 'No student found.' });
+      }
+      res.status(200).json(student);
+    })
+    .catch(error => {
+      console.error(error);
+      res.status(500).json({
+        message: 'The request could not be completed.',
+        error: error
+      });
+    });
+});
+
+// [PUT] /students/:id
+// Updates the student with the matching id using information sent in the body of the request.
+server.put('/students/:id', async (req, res) => {
+  if (!req.body.name && !req.body.cohort_id) {
+    return res.status(400).json({
+      message: 'Please include one or both `cohort_id` and `name` properties.'
+    });
+  }
+  try {
+    function updateStudent() {
+      return db('students')
+        .select()
+        .where('id', req.params.id)
+        .update(req.body)
+        .then(updatedRows => {
+          if (!updatedRows) {
+            return res.status(404).json({ message: 'No student found.' });
+          }
+          db('students')
+            .select()
+            .where('id', req.params.id)
+            .then(updatedStudent => res.status(201).json(updatedStudent[0]));
+        });
+    }
+    if (req.body.cohort_id) {
+      const cohortCheck = await db('cohorts')
+        .select()
+        .where('id', req.body.cohort_id)
+        .first()
+        .then(cohort => {
+          if (!cohort) {
+            return res.status(404).json({ message: 'No cohort found.' });
+          }
+          updateStudent();
+        });
+    } else {
+      updateStudent();
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: 'The request could not be completed.',
+      error: error
+    });
+  }
+});
+
+// [DELETE] /students/:id
+// Deletes the specified student.
+server.delete('/students/:id', (req, res) => {
+  db('students')
+    .where('id', req.params.id)
+    .del()
+    .then(delStatus => {
+      if (!delStatus) {
+        return res.status(404).json({ message: 'No student found.' });
+      }
+      res.status(204).end();
+    })
+    .catch(error => {
+      console.error(error);
+      res.status(500).json({
+        message: 'The request could not be completed.',
+        error: error
+      });
     });
 });
 
