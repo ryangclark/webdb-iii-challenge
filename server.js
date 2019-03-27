@@ -59,7 +59,7 @@ server.get('/api/cohorts/:id', (req, res) => {
   db('cohorts')
     .select('*')
     .where('id', req.params.id)
-    .then(cohort => res.status(200).json(cohort))
+    .then(cohort => res.status(200).json(cohort[0]))
     .catch(error => {
       console.error(error);
       res
@@ -102,13 +102,13 @@ server.put('/api/cohorts/:id', (req, res) => {
           .select('*')
           .where('id', req.params.id)
           .then(updatedCohort => res.status(201).json(updatedCohort))
-          .catch(error => {
-            console.error(error);
-            res
-              .status(500)
-              .json({ message: 'Error completing the request.', error: error });
-          });
       }
+    })
+    .catch(error => {
+      console.error(error);
+      res
+        .status(500)
+        .json({ message: 'Error completing the request.', error: error });
     });
 });
 
